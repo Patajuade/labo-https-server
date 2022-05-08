@@ -1,0 +1,286 @@
+
+
+
+HTTP sur ubuntu
+
+Amazon propose un DNS
+ajouter l'adresse aux adresses accessibles par notre appli
+
+
+Se connecter sur PUTTY : username = ubuntu
+_____________________________________
+
+MàJ d'usage
+
+	apt-get update
+	apt-get upgrade
+_____________________________________
+
+Installation du package associé au serveur Nginx
+
+	sudo apt update
+	sudo apt install nginx
+_____________________________________
+
+Aller autoriser le port 80 et 443 dans le pare-feu AWS
+
+systemctl status nginx
+curl -4 icanhazip.com		//obtenir notre adresse publique
+http://54.226.40.144		//avec l'adresse ip obtenue pour voir si la page nginx s'affiche
+_____________________________________
+
+Commandes de gestion Nginx
+
+	sudo systemctl stop nginx
+	sudo systemctl start nginx
+	sudo systemctl restart nginx
+_____________________________________
+
+Configurer votre serveur de sorte d'appliquer les bonnes pratiques de sécurité sur les
+en-têtes HTTP envoyées vers les différents clients en réponse aux requêtes.
+
+	cd /etc/nginx
+	nano nginx.conf
+	add_header X-Frame-Options "SAMEORIGIN" always;
+	add_header X-Content-Type-Options nosniff;
+	add_header X-XSS-Protection "1; mode=block";
+	add_header Content-Security-Policy "default-src 'self' *.memo-linux.com; img-src 'self' data: http: https: *.memo-linux.com; font-src 'self' data: http: https: fonts.googleapis.com";
+	add_header Strict-Transport-Security "max-age=31536000; includeSubdomains ; preload";
+	add_header Referrer-Policy "strict-origin";
+	add_header Permissions-Policy "geolocation=(),midi=(),sync-xhr=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()";
+
+-> Explication des headers
+X-Frame-Options
+	Cet en-tête permet de se protéger contre le détournement de clic (clickjacking)
+X-Content-Type-Options
+	Cet en-tête permet de faire une vérification stricte des types Mime. Elle n’accepte qu’une seule 	directive : nosniff.
+X-XSS-Protection
+	Cet en-tête permet d’activer les filtres anti-xss incorporés dans certains navigateurs.
+CSP : Content-Security-Policy
+	L’en-tête CSP permet d’autoriser seulement les domaines déclarés à exécuter du script JavaScript, 	une feuille de style css, etc.
+HSTS : HTTP Strict Transport Security
+	HSTS est un dispositif de sécurité par lequel un site web peut déclarer aux navigateurs qu’ils 	doivent communiquer avec lui en utilisant exclusivement le protocole HTTPS, au lieu du HTTP. De 	plus, cela permet d’éviter la réécriture de tous les chemins lorsqu’un site web passe au tout https.
+	Permission-Policy
+Permet au site de contrôler quelle APIs ou features peuvent être utilisées dans le navigateur
+
+	systemctl restart nginx
+	systemctl status nginx
+
+Pour vérifier les entêtes :
+securityheaders.com
+-> http://54.226.40.144
+
+Site virtuel
+ip, port
+on doit pas forcément utiliser un serveur dns officiel
+
+_____________________________________
+
+Création d'un serveur virtuel
+
+fichier host : Le fichier hosts est un fichier texte ordinaire utilisé par tous les systèmes d'exploitation Traduire les noms des hôtes (Également appelées adresses Web ou URL) vers des adresses IP
+
+	nano /etc/hosts
+	54.226.40.144 	la209563.helha.local
+	54.226.40.144 	LA209563.helha.local
+	54.226.40.144 	www.la209563.helha.local
+	54.226.40.144 	www.LA209563.helha.local
+
+Aller dans le fichier Host de la machine physique et y écrire
+-> ouvrir le bloc note en admin puis ouvrir..>C:\Windows\ System32\drivers\etc\hosts.
+
+	54.90.210.180 	la209563.helha.local
+	54.90.210.180 	LA209563.helha.local
+	54.90.210.180 	www.la209563.helha.local
+	54.90.210.180 	www.LA209563.helha.local
+
+cd /etc/nginx/sites-available	  // fichiers de configuration des sites disponibles
+cd /etc/nginx/sites-enabled	  //fichiers de configuration des sites actifs
+
+Lorsque l'on crée la configuration d'un nouveau site, on crée le fichier dans "sites-available" et ensuite lorsque le site est prêt à être activé, on crée un lien symbolique vers "sites-enabled".
+
+	sudo mkdir /var/www/la209563.helha.local	//créer le dossier qui va accueillir notre site Web
+	sudo chown -R $USER:$USER /var/www/la209563.helha.local/	
+	sudo chown -R www-data:www-data /var/www/la209563.helha.local/
+	sudo chmod 755 /var/www/la209563.helha.local/			//r uniquement + w pour les users
+	sudo nano /var/www/la209563.helha.local/index.html		//page d'accueil du site web
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<h1>Canavaggio-Diana Manon</h1>
+<img src="https://www.helha.be/app/uploads/2021/12/MicrosoftTeams-image-65.png" alt="Image de l'école" height="500" />
+</body>
+</html>
+
+	sudo nano /etc/nginx/sites-available/la209563.helha.local
+server {
+
+    	listen 80;
+    	listen [::]:80;
+
+    	root /var/www/la209563.helha.local;
+
+    	index index.html index.htm;
+
+    	server_name la209563.helha.local www.la209563.helha.local;
+
+    	location / {
+        try_files $uri $uri/ =404;
+   }
+}
+
+sudo nginx -t 		// vérifier la config
+ln -s /etc/nginx/sites-available/la209563.helha.local /etc/nginx/sites-enabled/la209563.helha.local //fait le lien entre les deux fichiers
+
+sudo nano /etc/nginx/nginx.conf
+Décommenter 
+...
+http {
+    ...
+    server_names_hash_bucket_size 64;
+    ...
+}
+...
+
+
+_______________________
+Ne plus pouvoir accéder au serveur via l'ip
+
+
+	sudo nano /etc/nginx/sites-available/la209563.helha.local
+	
+server {
+
+    listen 80;
+    listen [::]:80;
+    include /etc/nginx/blacklist.conf;
+    root /var/www/la209563.helha.local;
+
+    index index.html;
+#       index index;
+#       index.htm;
+
+    server_name la209563.helha.local www.la209563.helha.local;
+#    server_name ec2-54-226-40-144.compute-1.amazonaws.com
+
+    location / {
+        try_files $uri $uri/ =404;
+
+        deny 54.90.210.180;
+   }
+}
+
+	nano /etc/nginx/blacklist.conf
+deny 54.90.210.180;
+allow all;
+
+chown www-data.www-data /etc/nginx/blacklist.conf
+
+_______
+le contenu du dossier associé à votre site ne doit pas pouvoir être listé :
+L'affichage du contenu des dossiers se fait via le module Autoindex de Nginx.
+
+
+	nano /etc/nginx/sites-available/default
+
+location  /  {
+  autoindex  off;
+}
+
+
+	systemctl restart nginx
+	systemctl status nginx
+_____________________________________
+
+certificat autosigné
+
+	sudo apt-get install openssl
+	sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/private/nginx.key -out /etc/ssl/certs/nginx.crt
+	touch /etc/nginx/snippets/self-signed.conf
+	nano /etc/nginx/snippets/self-signed.conf
+
+ssl_certificate /etc/ssl/certs/nginx.crt;
+ssl_certificate_key /etc/ssl/private/nginx.key;
+
+ssl_protocols TLSv1.2;
+ssl_prefer_server_ciphers on;
+ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384;
+ssl_session_timeout 10m;
+ssl_session_cache shared:SSL:10m;
+ssl_session_tickets off;
+ssl_stapling on;
+ssl_stapling_verify on;
+resolver 8.8.8.8 8.8.4.4 valid=300s;
+resolver_timeout 5s;
+add_header X-Frame-Options DENY;
+add_header X-Content-Type-Options nosniff;
+add_header X-XSS-Protection "1; mode=block";
+
+	sudo nano /etc/nginx/sites-available/la209563.helha.local
+	include snippets/self-signed.conf;
+
+
+_______________________________________
+
+Ecoute de HTTP vers HTTPS
+
+sudo nano /etc/nginx/sites-available/la209563.helha.local
+
+server {
+        listen 80;
+        server_name la209563.helha.local www.la209563.helha.local;
+        return 301 https://$host$request_uri;
+}
+
+server {
+   # listen 80;
+    listen 443 ssl;
+
+    include snippets/self-signed.conf;
+    root /var/www/la209563.helha.local;
+    include /etc/nginx/blacklist.conf;
+    index index.html index.htm;
+
+    server_name la209563.helha.local www.la209563.helha.local;
+#    server_name ec2-54-226-40-144.compute-1.amazonaws.com
+#    return 301 https://$host$request_uri;
+
+    location / {
+        try_files $uri $uri/ =404;
+        deny 54.90.210.180;
+   }
+}
+
+
+
+
+____________
+
+old :
+
+server {
+
+    listen 80;
+    listen [::]:80;
+    listen 443 ssl;
+
+    include snippets/self-signed.conf;
+    root /var/www/la209563.helha.local;
+    include /etc/nginx/blacklist.conf;
+    index index.html index.htm;
+
+    server_name la209563.helha.local www.la209563.helha.local;
+#    server_name ec2-54-226-40-144.compute-1.amazonaws.com
+
+    location / {
+        try_files $uri $uri/ =404;
+
+        deny 54.90.210.180;
+   }
+}
+
+
+
+
+
+
