@@ -81,10 +81,10 @@ Création d'un serveur virtuel
 fichier host : Le fichier hosts est un fichier texte ordinaire utilisé par tous les systèmes d'exploitation Traduire les noms des hôtes (Également appelées adresses Web ou URL) vers des adresses IP
 
 	nano /etc/hosts
-	54.226.40.144 	la209563.helha.local
-	54.226.40.144 	LA209563.helha.local
-	54.226.40.144 	www.la209563.helha.local
-	54.226.40.144 	www.LA209563.helha.local
+	54.80.153.160	la209563.helha.local
+	54.80.153.160	LA209563.helha.local
+	54.80.153.160	www.la209563.helha.local
+	54.80.153.160	www.LA209563.helha.local
 
 Aller dans le fichier Host de la machine physique et y écrire
 -> ouvrir le bloc note en admin puis ouvrir..>C:\Windows\ System32\drivers\etc\hosts.
@@ -176,6 +176,10 @@ allow all;
 
 chown www-data.www-data /etc/nginx/blacklist.conf
 
+etc nginx sites available
+mettre le dns d'aws dans server_name
+dans default aussi
+
 _______
 le contenu du dossier associé à votre site ne doit pas pouvoir être listé :
 L'affichage du contenu des dossiers se fait via le module Autoindex de Nginx.
@@ -202,7 +206,7 @@ certificat autosigné
 ssl_certificate /etc/ssl/certs/nginx.crt;
 ssl_certificate_key /etc/ssl/private/nginx.key;
 
-ssl_protocols TLSv1.2;
+ssl_protocols TLSv1.2 TLSv1.3;
 ssl_prefer_server_ciphers on;
 ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384;
 ssl_session_timeout 10m;
@@ -215,6 +219,13 @@ resolver_timeout 5s;
 add_header X-Frame-Options DENY;
 add_header X-Content-Type-Options nosniff;
 add_header X-XSS-Protection "1; mode=block";
+add_header X-Frame-Options "SAMEORIGIN" always;
+add_header X-Content-Type-Options nosniff;
+add_header X-XSS-Protection "1; mode=block";
+add_header Content-Security-Policy "default-src 'self' *.memo-linux.com; img-src 'self' data: http: https: *.memo-linux.com; font-src 'self' data: http: https: fonts.googleapis.com";
+add_header Strict-Transport-Security "max-age=31536000; includeSubdomains ; preload";
+add_header Referrer-Policy "strict-origin";
+add_header Permissions-Policy "geolocation=(),midi=(),sync-xhr=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()";
 
 	sudo nano /etc/nginx/sites-available/la209563.helha.local
 	include snippets/self-signed.conf;
@@ -225,6 +236,69 @@ _______________________________________
 Ecoute de HTTP vers HTTPS
 
 sudo nano /etc/nginx/sites-available/la209563.helha.local
+
+
+server {
+        listen 80;
+        #server_name la209563.helha.local www.la209563.helha.local;
+        server_name ec2-54-80-153-160.compute-1.amazonaws.com  la209563.helha.local www.la209563.helha.local LA209563.helha.local www.LA209563.helha.local;
+        return 301 https://$host$request_uri;
+}
+
+server {
+   # listen 80;
+    listen 443 ssl;
+
+    include snippets/self-signed.conf;
+    root /var/www/la209563.helha.local;
+
+    index index.html index.htm;
+
+    #server_name la209563.helha.local www.la209563.helha.local;
+    server_name ec2-54-80-153-160.compute-1.amazonaws.com la209563.helha.local www.la209563.helha.local LA209563.helha.local www.LA209563.helha.local;
+
+    location / {
+        autoindex OFF;
+        try_files $uri $uri/ =404;
+   }
+}
+
+
+
+sudo nano /etc/nginx/sites-available/default
+
+server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+
+        # SSL configuration
+        #
+         listen 443 ssl default_server;
+
+        include snippets/self-signed.conf;
+        root /var/www/html;
+
+        # Add index.php to the list if you are using PHP
+        index index.html index.htm index.nginx-debian.html;
+
+        server_name _;
+
+        location /{
+                # First attempt to serve request as file, then
+                # as directory, then fall back to displaying a 404.
+                try_files $uri $uri/ =404;
+        }
+
+
+
+____________________________________________________________________________
+
+
+
+
+
+old ;
+
 
 server {
         listen 80;
@@ -252,14 +326,10 @@ server {
 }
 
 
-
-
-____________
-
-old :
+oldold :
 
 server {
-
+3
     listen 80;
     listen [::]:80;
     listen 443 ssl;
